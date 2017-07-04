@@ -22,7 +22,7 @@ use network::protocol::{ProtocolResult,TlsHandshake,Http,Pipe};
 use network::proxy::{Server,ProxyChannel};
 use network::session::{BackendConnectAction,BackendConnectionStatus,ProxyClient,ProxyConfiguration,Readiness,ListenToken,FrontToken,BackToken,AcceptError,Session};
 use network::socket::{SocketHandler,SocketResult,server_bind};
-use messages::{self,Order,HttpFront,HttpProxyConfiguration,OrderMessage,OrderMessageAnswer,OrderMessageStatus};
+use messages::{self,Order,HttpFront,HttpProxyConfiguration,OrderMessage,OrderMessageAnswer,OrderMessageStatus,OrderMessageAnswerData};
 use channel::Channel;
 use parser::http11::hostname_and_port;
 use util::UnwrapLog;
@@ -648,6 +648,10 @@ impl ProxyConfiguration<Client> for ServerConfiguration {
       Order::Status => {
         info!("{} status", message.id);
         channel.write_message(&OrderMessageAnswer{ id: message.id, status: OrderMessageStatus::Ok, data: None});
+      },
+      Order::Metrics => {
+        info!("{} metrics http", message.id);
+        channel.write_message(&OrderMessageAnswer{ id: message.id, status: OrderMessageStatus::Ok, data: Some(OrderMessageAnswerData::Metrics(String::from("test")))});
       },
       command => {
         debug!("{} unsupported message, ignoring: {:?}", message.id, command);

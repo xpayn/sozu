@@ -311,7 +311,7 @@ impl CommandServer {
 
     let data = match msg.data {
       None => None,
-      Some(OrderMessageAnswerData::Metrics) => Some(AnswerData::Metrics),
+      Some(OrderMessageAnswerData::Metrics(data)) => Some(AnswerData::Metrics(data)),
     };
 
     let answer = ConfigMessageAnswer::new(

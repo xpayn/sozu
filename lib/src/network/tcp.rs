@@ -521,6 +521,10 @@ impl ProxyConfiguration<Client> for ServerConfiguration {
         info!("{} status", message.id);
         channel.write_message(&OrderMessageAnswer{ id: message.id, status: OrderMessageStatus::Ok, data: None});
       },
+      Order::Metrics => {
+        info!("{} metrics tcp", message.id);
+        channel.write_message(&OrderMessageAnswer{ id: message.id, status: OrderMessageStatus::Ok, data: None});
+      },
       _ => {
         error!("unsupported message, ignoring");
         channel.write_message(&OrderMessageAnswer{ id: message.id, status: OrderMessageStatus::Error(String::from("unsupported message")), data: None});

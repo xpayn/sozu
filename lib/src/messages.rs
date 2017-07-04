@@ -33,7 +33,7 @@ pub enum OrderMessageStatus {
 #[derive(Debug,Clone,PartialEq,Eq,Hash, Serialize, Deserialize)]
 pub enum OrderMessageAnswerData {
   //placeholder for now
-  Metrics,
+  Metrics(String),
 }
 
 #[derive(Debug,Clone,Serialize,Deserialize)]
@@ -70,6 +70,8 @@ pub enum Order {
 
     SoftStop,
     HardStop,
+
+    Metrics,
 
     Status
 }
@@ -198,7 +200,6 @@ impl Default for HttpsProxyConfiguration {
   }
 }
 
-
 impl Order {
   pub fn get_topics(&self) -> HashSet<Topic> {
     match *self {
@@ -216,6 +217,7 @@ impl Order {
       Order::HttpsProxy(_)        => [Topic::HttpsProxyConfig].iter().cloned().collect(),
       Order::SoftStop             => [Topic::HttpProxyConfig, Topic::HttpsProxyConfig, Topic::TcpProxyConfig].iter().cloned().collect(),
       Order::HardStop             => [Topic::HttpProxyConfig, Topic::HttpsProxyConfig, Topic::TcpProxyConfig].iter().cloned().collect(),
+      Order::Metrics              => [Topic::HttpProxyConfig, Topic::HttpsProxyConfig, Topic::TcpProxyConfig].iter().cloned().collect(),
       Order::Status               => [Topic::HttpProxyConfig, Topic::HttpsProxyConfig, Topic::TcpProxyConfig].iter().cloned().collect(),
     }
   }
@@ -286,6 +288,8 @@ impl<'de> serde::de::Visitor<'de> for OrderVisitor {
       return Ok(Order::HardStop);
     } else if &command_type == "STATUS" {
       return Ok(Order::Status);
+    } else if &command_type == "METRICS" {
+      return Ok(Order::Metrics);
     }
 
     let data = match data {
@@ -405,6 +409,9 @@ impl serde::Serialize for Order {
       },
       &Order::Status => {
         try!(map.serialize_entry("type", "STATUS"));
+      },
+      &Order::Metrics => {
+        try!(map.serialize_entry("type", "METRICS"));
       },
     }
 

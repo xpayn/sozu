@@ -183,6 +183,36 @@ impl CommandServer {
           // FIXME: should send back error here
           error!("no proxy found");
         }
+      },
+      ConfigCommand::Metrics => {
+        info!("Got Metrics ConfigCommand, dispatching..");
+        for ref mut proxy in self.proxies.values_mut() {
+          let o = Order::Metrics;
+          proxy.inflight.insert(message.id.clone(), o.clone());
+          self.conns[token].add_message_id(message.id.clone());
+          proxy.channel.set_blocking(true);
+          proxy.channel.write_message(&OrderMessage { id: message.id.clone(), order: o});
+          //proxy.channel.run();
+
+          //println!("{:?}", proxy.channel);
+
+          // TODO: only send once metrics are gathered from all workers
+          match proxy.channel.read_message() {
+            Some(message) => {
+              println!("Status: {:?}", message.status);
+              self.conns[token].write_message(&ConfigMessageAnswer::new(
+                message.id.clone(),
+                ConfigMessageStatus::Ok,
+                "Metrics: test".to_string(),
+                None
+              ));
+              break;
+            },
+            None => {
+              //println!("Not received yet..");
+            }
+          }
+        }
       }
     }
   }

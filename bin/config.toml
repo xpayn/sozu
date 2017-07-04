@@ -1,6 +1,6 @@
 # sozu proxy test config file
 
-command_socket = "./command_folder/sock"
+command_socket = "/home/arnaud/Dev/sozu/bin/command_folder/sock"
 saved_state    = "./state.json"
 log_level      = "info"
 log_target     = "stdout"

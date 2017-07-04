@@ -143,6 +143,36 @@ pub fn soft_stop(channel: &mut Channel<ConfigMessage,ConfigMessageAnswer>) {
   }
 }
 
+pub fn metrics(channel: &mut Channel<ConfigMessage, ConfigMessageAnswer>) {
+  println!("requesting metrics..");
+  let id = generate_id();
+  channel.write_message(&ConfigMessage::new(
+    id.clone(),
+    ConfigCommand::Metrics,
+    None
+  ));
+
+  loop {
+    match channel.read_message() {
+      None          => println!("the proxy didn't answer"),
+      Some(message) => {
+        if &id != &message.id {
+          println!("received message with invalid id: {:?}", message);
+          return;
+        }
+
+        match message.status {
+          ConfigMessageStatus::Ok => {
+            println!("Got OK for Metrics");
+            break;
+          },
+          _ => println!("Got other message response: {:?}", message)
+        }
+      }
+    }
+  }
+}
+
 pub fn hard_stop(channel: &mut Channel<ConfigMessage,ConfigMessageAnswer>) {
   println!("shutting down proxy");
   let id = generate_id();

@@ -17,7 +17,7 @@ use sozu::channel::Channel;
 use sozu_command::config::Config;
 use sozu_command::data::{ConfigMessage,ConfigMessageAnswer};
 
-use command::{dump_state,load_state,save_state,soft_stop,hard_stop,upgrade,status, remove_backend, add_backend, remove_frontend, add_frontend};
+use command::{dump_state,load_state,metrics,save_state,soft_stop,hard_stop,upgrade,status, remove_backend, add_backend, remove_frontend, add_frontend};
 
 fn main() {
   let matches = App::new("sozuctl")
@@ -157,6 +157,8 @@ fn main() {
                                                       .value_name("path to the certificate")
                                                       .takes_value(true)
                                                       .required(true))))
+                        .subcommand(SubCommand::with_name("metrics")
+                                    .about("get metrics about running workers"))
                         .get_matches();
 
   let config_file = matches.value_of("config").expect("required config file");
@@ -230,6 +232,9 @@ fn main() {
         }
         _ => println!("unknown backend management command")
       }
+    },
+    ("metrics", Some(_)) => {
+      metrics(&mut channel);
     },
     _                => println!("unknown subcommand")
   }

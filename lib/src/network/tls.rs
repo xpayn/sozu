@@ -998,6 +998,10 @@ impl ProxyConfiguration<TlsClient> for ServerConfiguration {
         info!("{} status", message.id);
         channel.write_message(&OrderMessageAnswer{ id: message.id, status: OrderMessageStatus::Ok, data: None});
       },
+      Order::Metrics => {
+        info!("{} metrics tls", message.id);
+        channel.write_message(&OrderMessageAnswer{ id: message.id, status: OrderMessageStatus::Ok, data: None});
+      },
       command => {
         error!("{} unsupported message, ignoring {:?}", message.id, command);
         channel.write_message(&OrderMessageAnswer{ id: message.id, status: OrderMessageStatus::Error(String::from("unsupported message")), data: None});
