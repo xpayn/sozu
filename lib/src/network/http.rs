@@ -285,6 +285,10 @@ impl ProxyClient for Client {
       }
     }
   }
+
+  fn get_instance(&self) -> Option<Rc<RefCell<Backend>>> {
+    self.instance.clone()
+  }
 }
 
 type ClientToken = Token;

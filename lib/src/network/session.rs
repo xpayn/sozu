@@ -20,6 +20,10 @@ use time::precise_time_ns;
 use std::time::Duration;
 use rand::random;
 
+use std::rc::{Rc,Weak};
+use std::cell::RefCell;
+use network::{Backend};
+
 use sozu_command::channel::Channel;
 use sozu_command::messages::{self,TcpFront,Order,Instance,MessageId,OrderMessage,
   OrderMessageAnswer,OrderMessageStatus};
@@ -127,6 +131,7 @@ pub trait ProxyClient {
   fn remove_backend(&mut self) -> (Option<String>, Option<SocketAddr>);
   fn readiness(&mut self)      -> &mut Readiness;
   fn protocol(&self)           -> Protocol;
+  fn get_instance(&self) -> Option<Rc<RefCell<Backend>>>;
 }
 
 #[derive(Clone,Copy,Debug,PartialEq)]
@@ -292,13 +297,16 @@ impl<ServerConfiguration:ProxyConfiguration<Client>,Client:ProxyClient> Session<
   }
 
   pub fn connect_to_backend(&mut self, poll: &mut Poll, token: FrontToken) {
+    debug!("token: {:?}", token);
     match self.configuration.connect_to_backend(poll, &mut self.clients[token]) {
       Ok(BackendConnectAction::Reuse) => {
         debug!("keepalive, reusing backend connection");
       }
       Ok(BackendConnectAction::Replace) => {
+        debug!("metrics: replace backend connection for token: {:?}", token);
         if let Some(backend_token) = self.clients[token].back_token() {
           if let Some(sock) = self.clients[token].back_socket() {
+            debug!("metrics: poll socket with token {:?} and back token {:?}", token, backend_token);
             poll.register(
               sock,
               backend_token,
@@ -318,17 +326,22 @@ impl<ServerConfiguration:ProxyConfiguration<Client>,Client:ProxyClient> Session<
       Ok(BackendConnectAction::New) => {
         incr!("backend.connections");
         if let Ok(backend_token) = self.backend.insert(token) {
+          debug!("metrics: Ok(backend_token) for token {:?}", token);
           let back = self.from_back(backend_token);
           self.clients[token].set_back_token(back);
+          debug!("set back token for token {:?} and instance {:?}", backend_token, self.clients[token].get_instance());
 
           //self.clients[token].readiness().back_interest = Ready::writable() | UnixReady::hup() | UnixReady::error();
           if let Some(sock) = self.clients[token].back_socket() {
+            debug!("metrics: poll socket with token {:?} and back token {:?}", token, back);
             poll.register(
               sock,
               back,
               Ready::readable() | Ready::writable() | Ready::from(UnixReady::hup() | UnixReady::error()),
               PollOpt::edge()
             );
+          } else {
+            debug!("metrics: we don't poll the socket");
           }
 
           let back = self.from_back(backend_token);
@@ -338,6 +351,8 @@ impl<ServerConfiguration:ProxyConfiguration<Client>,Client:ProxyClient> Session<
           }
           */
           return;
+        } else {
+          debug!("metrics, Err(backend_token)");
         }
       },
       Err(ConnectionError::HostNotFound) | Err(ConnectionError::NoBackendAvailable) => {
@@ -382,7 +397,7 @@ impl<ServerConfiguration:ProxyConfiguration<Client>,Client:ProxyClient> Session<
 impl<ServerConfiguration:ProxyConfiguration<Client>,Client:ProxyClient> Session<ServerConfiguration,Client> {
 
   pub fn ready(&mut self, poll: &mut Poll, token: Token, events: Ready) {
-    //info!("PROXY\t{:?} got events: {:?}", token, events);
+    info!("PROXY\t{:?} got events: {:?}", token, events);
 
     let client_token:FrontToken = match socket_type(token, self.base_token, self.max_listeners, self.max_connections) {
       Some(SocketType::Listener) => {
@@ -446,7 +461,8 @@ impl<ServerConfiguration:ProxyConfiguration<Client>,Client:ProxyClient> Session<
       let back_interest = self.clients[client_token].readiness().back_interest &
         self.clients[client_token].readiness().back_readiness;
 
-      //info!("PROXY\t{:?} {:?} | {:?} front: {:?} | back: {:?} ", client_token, events, self.clients[client_token].readiness(), front_interest, back_interest);
+      info!("PROXY\t{:?} {:?} | {:?} front: {:?} | back: {:?} ", client_token, events, self.clients[client_token].readiness(), front_interest, back_interest);
+      debug!("client: {:?}", self.clients[client_token].get_instance());
 
       if front_interest == UnixReady::from(Ready::empty()) && back_interest == UnixReady::from(Ready::empty()) {
         break;

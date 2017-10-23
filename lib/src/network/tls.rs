@@ -164,6 +164,10 @@ impl TlsClient {
 }
 
 impl ProxyClient for TlsClient {
+  fn get_instance(&self) -> Option<Rc<RefCell<Backend>>> {
+    self.instance.clone()
+  }
+
   fn front_socket(&self) -> &TcpStream {
     unwrap_msg!(self.front.as_ref())
   }
@@ -763,15 +767,29 @@ impl ServerConfiguration {
     trace!("looking for backend for real host: {}", real_host);
 
     if let Some(app_id) = self.frontend_from_request(real_host, uri).map(|ref front| front.app_id.clone()) {
+      if(uri.contains("metrics")){
+        debug!("Found APP_ID for metrics: {:?}", app_id);
+        debug!("client app_id before: {:?}", client.http().map(|h| h.app_id.clone()));
+      }
       client.http().map(|h| h.app_id = Some(app_id.clone()));
+
+      if uri.contains("metrics") {
+        debug!("client app_id after: {:?}", client.http().map(|h| h.app_id.clone()));
+      }
 
       match self.instances.backend_from_app_id(&app_id) {
         Err(e) => {
+          if(uri.contains("metrics")){
+            debug!("metrics backend has an error, sending 503");
+          }
           client.set_answer(&self.answers.ServiceUnavailable);
           Err(e)
         },
         Ok((backend, conn))  => {
           client.back_connected = BackendConnectionStatus::Connecting;
+          if(uri.contains("metrics")){
+            debug!("metrics backend is Connecting");
+          }
           if front_should_stick {
             client.http().map(|http| http.sticky_session = Some(StickySession::new(backend.borrow().id.clone())));
           }
@@ -867,6 +885,7 @@ impl ProxyConfiguration<TlsClient> for ServerConfiguration {
 
       let front_should_stick = self.applications.get(&app_id).map(|ref app| app.sticky_session).unwrap_or(false);
 
+      debug!("connect_to_backend: app_id: {}, back_connected: {:?}, uri: {}, client app_id: {:?}, instance: {:?}", app_id, client.back_connected.clone(), rl.uri, client.http().map(|h| h.app_id.clone()), client.instance);
       if (client.http().map(|h| h.app_id.as_ref()).unwrap_or(None) == Some(&app_id)) && client.back_connected == BackendConnectionStatus::Connected {
         //matched on keepalive
         return Ok(BackendConnectAction::Reuse);
@@ -882,6 +901,10 @@ impl ProxyConfiguration<TlsClient> for ServerConfiguration {
       }
 
       let reused = client.http().map(|http| http.app_id.is_some()).unwrap_or(false);
+      if rl.uri.contains("metrics") {
+        debug!("metrics: reused app: {:?}", client.http().map(|http| http.app_id.clone()).expect("unwrap metrics"));
+      }
+      //let reused = false;
       //deregister back socket if it is the wrong one or if it was not connecting
       if reused || client.back_connected == BackendConnectionStatus::Connecting {
         client.instance = None;
@@ -894,12 +917,20 @@ impl ProxyConfiguration<TlsClient> for ServerConfiguration {
         });
       }
 
+      if rl.uri.contains("metrics") {
+        trace!("FOUND METRICS CALL");
+      }
+
       let conn   = try!(unwrap_msg!(client.http()).state().get_front_keep_alive().ok_or(ConnectionError::ToBeDefined));
       let sticky_session = client.http().unwrap().state.as_ref().unwrap().get_request_sticky_session();
       let conn = match (front_should_stick, sticky_session) {
         (true, Some(session)) => self.backend_from_sticky_session(client, &app_id, session),
         _ => self.backend_from_request(client, &host, &rl.uri, front_should_stick),
       };
+
+      if(rl.uri.contains("metrics")){
+        debug!("metrics: After connection, conn is OK: {}", conn.is_ok());
+      }
 
       match conn {
         Ok(socket) => {
@@ -918,6 +949,10 @@ impl ProxyConfiguration<TlsClient> for ServerConfiguration {
             added_res_header: added_res_header,
           });
 
+          if(rl.uri.contains("metrics")) {
+            //debug!("metrics reused: {}", reused);
+          }
+          debug!("reused: {}", reused);
           client.set_back_socket(socket);
           if reused {
             Ok(BackendConnectAction::Replace)

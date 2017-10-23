@@ -33,6 +33,9 @@ use network::socket::{SocketHandler,SocketResult,server_bind};
 use util::UnwrapLog;
 
 
+use std::rc::{Rc,Weak};
+use std::cell::RefCell;
+
 const SERVER: Token = Token(0);
 
 #[derive(Debug,Clone,PartialEq,Eq)]
@@ -91,6 +94,9 @@ impl Client {
 }
 
 impl ProxyClient for Client {
+  fn get_instance(&self) -> Option<Rc<RefCell<Backend>>> {
+    None
+  }
   fn front_socket(&self) -> &TcpStream {
     &self.sock
   }

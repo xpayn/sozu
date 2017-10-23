@@ -45,7 +45,7 @@ version = "~0.2.0"
 features = ["v4"]
 
 [features]
-default  = []
+default  = ["unstable"]
 splice   = []
 unstable = []
 
